@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Livestream Like Avatar Bouncer - Limit 500</title>
+    <title>Livestream Like Avatar Bouncer</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;800&display=swap" rel="stylesheet">
     <style>
         * {
@@ -23,6 +23,7 @@
             flex-direction: column;
         }
 
+        /* Thanh điều hướng dán Link */
         .control-bar {
             position: absolute;
             top: 20px;
@@ -74,6 +75,7 @@
             box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
         }
 
+        /* Canvas hiển thị bóng nảy */
         canvas {
             display: block;
             width: 100vw;
@@ -84,36 +86,35 @@
             position: absolute;
             bottom: 20px;
             right: 20px;
-            background: rgba(0,0,0,0.7);
-            border: 1px solid rgba(0, 255, 204, 0.3);
+            background: rgba(0,0,0,0.6);
             padding: 8px 15px;
             border-radius: 8px;
             font-size: 13px;
-            color: #00ffcc;
+            color: #94a3b8;
             pointer-events: none;
-            font-weight: 600;
         }
     </style>
 </head>
 <body>
 
+    <!-- Thanh dán link Live Stream -->
     <div class="control-bar">
-        <input type="text" id="streamUrl" class="input-url" placeholder="Dán link Live Stream vào đây...">
+        <input type="text" id="streamUrl" class="input-url" placeholder="Dán link Live Stream (TikTok, FB, YouTube) vào đây...">
         <button class="btn-connect" onclick="loadLiveStreamLikes()">🚀 LẤY LIKE LIVE</button>
     </div>
 
-    <div class="info-badge" id="statusText">Số bóng: 0 / 500</div>
+    <div class="info-badge" id="statusText">Số bóng Avatar đang nảy: 0</div>
 
+    <!-- Khung vẽ Canvas physics -->
     <canvas id="bounceCanvas"></canvas>
 
 <script>
     const canvas = document.getElementById("bounceCanvas");
     const ctx = canvas.getContext("2d");
-    
-    // --- CẤU HÌNH GIỚI HẠN BÓNG ---
-    const MAX_BALLS = 500; // Giới hạn tối đa 500 bóng
     let balls = [];
+    let animationFrameId;
 
+    // Tự động fit kích thước Canvas theo màn hình
     function resizeCanvas() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -121,24 +122,28 @@
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
+    // --- LỚP VẬT LÝ QUẢ BÓNG AVATAR ---
     class AvatarBall {
         constructor(x, y, avatarUrl, name) {
             this.x = x;
             this.y = y;
-            // Thu nhỏ bán kính xuống 20px để khi có 500 bóng vẫn nhìn thoáng
-            this.radius = 20; 
-            this.vx = (Math.random() - 0.5) * 6;
-            this.vy = (Math.random() - 0.5) * 6;
+            this.radius = 35; // Bán kính quả bóng
+            // Vận tốc nẫu nhiên (Tốc độ nảy)
+            this.vx = (Math.random() - 0.5) * 8;
+            this.vy = (Math.random() - 0.5) * 8;
             this.name = name;
 
+            // Load ảnh Avatar
             this.img = new Image();
             this.img.src = avatarUrl;
         }
 
         update() {
+            // Cập nhật vị trí
             this.x += this.vx;
             this.y += this.vy;
 
+            // Nảy khi va vào cạnh TRÁI / PHẢI
             if (this.x - this.radius < 0) {
                 this.x = this.radius;
                 this.vx *= -1;
@@ -147,6 +152,7 @@
                 this.vx *= -1;
             }
 
+            // Nảy khi va vào cạnh TRÊN / DƯỚI
             if (this.y - this.radius < 0) {
                 this.y = this.radius;
                 this.vy *= -1;
@@ -157,6 +163,7 @@
         }
 
         draw() {
+            // 1. Vẽ Quả bóng chứa Avatar tròn
             ctx.save();
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -171,33 +178,25 @@
             }
             ctx.restore();
 
-            // Viền phát sáng
+            // 2. Vẽ viền Neon phát sáng quanh bóng
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
             ctx.strokeStyle = "#00ffcc";
             ctx.stroke();
+
+            // 3. Vẽ tên người Like dưới quả bóng
+            ctx.font = "bold 12px 'Plus Jakarta Sans', sans-serif";
+            ctx.fillStyle = "#ffffff";
+            ctx.textAlign = "center";
+            ctx.shadowColor = "black";
+            ctx.shadowBlur = 4;
+            ctx.fillText(this.name, this.x, this.y + this.radius + 16);
+            ctx.shadowBlur = 0; // Reset shadow
         }
     }
 
-    // Hàm thêm 1 bóng mới có kiểm tra giới hạn 500
-    function addBall(avatarUrl, name) {
-        // Nếu đã đủ 500 bóng -> Xóa bóng cũ nhất (đầu mảng) để nhường chỗ cho bóng mới
-        if (balls.length >= MAX_BALLS) {
-            balls.shift(); 
-        }
-
-        let startX = Math.random() * (canvas.width - 80) + 40;
-        let startY = Math.random() * (canvas.height - 80) + 40;
-        balls.push(new AvatarBall(startX, startY, avatarUrl, name));
-
-        updateStatus();
-    }
-
-    function updateStatus() {
-        document.getElementById("statusText").innerText = `Số bóng: ${balls.length} / ${MAX_BALLS}`;
-    }
-
+    // --- VÒNG LẶP ANIMATION (60 FPS) ---
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -206,9 +205,10 @@
             ball.draw();
         });
 
-        requestAnimationFrame(animate);
+        animationFrameId = requestAnimationFrame(animate);
     }
 
+    // --- XỬ LÝ KHIN ĐỔI LINK LIVE STREAM MỚI ---
     function loadLiveStreamLikes() {
         const url = document.getElementById("streamUrl").value.trim();
         if (!url) {
@@ -216,16 +216,35 @@
             return;
         }
 
-        // 1. ĐỔI LINK MỚI -> XÓA SẠCH DÀN BÓNG CỦ
+        // 1. XÓA SẠCH DÀN BÓNG CŨ
         balls = [];
 
-        // 2. TẠO THỬ NGHIỆM ĐỦ 500 BÓNG TỪ LINK MỚI
-        for (let i = 1; i <= 500; i++) {
-            let randomImgId = (i % 70) + 1; // Tạo ID ảnh ngẫu nhiên
-            addBall(`https://i.pravatar.cc/150?img=${randomImgId}`, `User_${i}`);
-        }
+        // 2. MÔ PHỎNG NẠP DÀN AVATAR MỚI TỪ LINK VỪA NHẬP
+        // (Trong thực tế, đoạn này sẽ gọi API lấy danh sách user thả Like của Stream đó)
+        
+        // Danh sách Avatar ngẫu nhiên test giao diện
+        const sampleUsers = [
+            { name: "Minh Tuấn", avatar: "https://i.pravatar.cc/150?img=11" },
+            { name: "Linh Gamer", avatar: "https://i.pravatar.cc/150?img=5" },
+            { name: "Hoàng Pro", avatar: "https://i.pravatar.cc/150?img=3" },
+            { name: "Thảo Nhi", avatar: "https://i.pravatar.cc/150?img=9" },
+            { name: "Đạt 0ms", avatar: "https://i.pravatar.cc/150?img=60" },
+            { name: "Hùng Master", avatar: "https://i.pravatar.cc/150?img=68" },
+            { name: "Trâm Anh", avatar: "https://i.pravatar.cc/150?img=47" },
+            { name: "Văn Nam", avatar: "https://i.pravatar.cc/150?img=12" }
+        ];
+
+        // Tạo bóng rơi từ vị trí ngẫu nhiên
+        sampleUsers.forEach(user => {
+            let startX = Math.random() * (canvas.width - 100) + 50;
+            let startY = Math.random() * (canvas.height - 100) + 50;
+            balls.push(new AvatarBall(startX, startY, user.avatar, user.name));
+        });
+
+        document.getElementById("statusText").innerText = `Số bóng Avatar đang nảy: ${balls.length}`;
     }
 
+    // Chạy Animation ngay khi mở web
     animate();
 </script>
 
