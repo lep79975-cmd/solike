@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Livestream Like Avatar Bouncer - Limit 500</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background-color: #090d16;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-bar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(18, 26, 43, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 12px 20px;
+            border-radius: 50px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 90%;
+            max-width: 650px;
+        }
+
+        .input-url {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 30px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .input-url:focus {
+            border-color: #00ffcc;
+        }
+
+        .btn-connect {
+            background: linear-gradient(135deg, #00ffcc, #00b386);
+            color: #000;
+            font-weight: 800;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-connect:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .info-badge {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid rgba(0, 255, 204, 0.3);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #00ffcc;
+            pointer-events: none;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="control-bar">
+        <input type="text" id="streamUrl" class="input-url" placeholder="Dán link Live Stream vào đây...">
+        <button class="btn-connect" onclick="loadLiveStreamLikes()">🚀 LẤY LIKE LIVE</button>
+    </div>
+
+    <div class="info-badge" id="statusText">Số bóng: 0 / 500</div>
+
+    <canvas id="bounceCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById("bounceCanvas");
+    const ctx = canvas.getContext("2d");
+    
+    // --- CẤU HÌNH GIỚI HẠN BÓNG ---
+    const MAX_BALLS = 500; // Giới hạn tối đa 500 bóng
+    let balls = [];
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    class AvatarBall {
+        constructor(x, y, avatarUrl, name) {
+            this.x = x;
+            this.y = y;
+            // Thu nhỏ bán kính xuống 20px để khi có 500 bóng vẫn nhìn thoáng
+            this.radius = 20; 
+            this.vx = (Math.random() - 0.5) * 6;
+            this.vy = (Math.random() - 0.5) * 6;
+            this.name = name;
+
+            this.img = new Image();
+            this.img.src = avatarUrl;
+        }
+
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+
+            if (this.x - this.radius < 0) {
+                this.x = this.radius;
+                this.vx *= -1;
+            } else if (this.x + this.radius > canvas.width) {
+                this.x = canvas.width - this.radius;
+                this.vx *= -1;
+            }
+
+            if (this.y - this.radius < 0) {
+                this.y = this.radius;
+                this.vy *= -1;
+            } else if (this.y + this.radius > canvas.height) {
+                this.y = canvas.height - this.radius;
+                this.vy *= -1;
+            }
+        }
+
+        draw() {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+
+            if (this.img.complete && this.img.naturalWidth !== 0) {
+                ctx.drawImage(this.img, this.x - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2);
+            } else {
+                ctx.fillStyle = "#6366f1";
+                ctx.fill();
+            }
+            ctx.restore();
+
+            // Viền phát sáng
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#00ffcc";
+            ctx.stroke();
+        }
+    }
+
+    // Hàm thêm 1 bóng mới có kiểm tra giới hạn 500
+    function addBall(avatarUrl, name) {
+        // Nếu đã đủ 500 bóng -> Xóa bóng cũ nhất (đầu mảng) để nhường chỗ cho bóng mới
+        if (balls.length >= MAX_BALLS) {
+            balls.shift(); 
+        }
+
+        let startX = Math.random() * (canvas.width - 80) + 40;
+        let startY = Math.random() * (canvas.height - 80) + 40;
+        balls.push(new AvatarBall(startX, startY, avatarUrl, name));
+
+        updateStatus();
+    }
+
+    function updateStatus() {
+        document.getElementById("statusText").innerText = `Số bóng: ${balls.length} / ${MAX_BALLS}`;
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        balls.forEach(ball => {
+            ball.update();
+            ball.draw();
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    function loadLiveStreamLikes() {
+        const url = document.getElementById("streamUrl").value.trim();
+        if (!url) {
+            alert("Vui lòng dán link Live Stream vào!");
+            return;
+        }
+
+        // 1. ĐỔI LINK MỚI -> XÓA SẠCH DÀN BÓNG CỦ
+        balls = [];
+
+        // 2. TẠO THỬ NGHIỆM ĐỦ 500 BÓNG TỪ LINK MỚI
+        for (let i = 1; i <= 500; i++) {
+            let randomImgId = (i % 70) + 1; // Tạo ID ảnh ngẫu nhiên
+            addBall(`https://i.pravatar.cc/150?img=${randomImgId}`, `User_${i}`);
+        }
+    }
+
+    animate();
+</script>
+
+</body>
+</html>
